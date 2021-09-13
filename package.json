@@ -1,0 +1,36 @@
+{
+  "name": "Lottery",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "testrpc": "ganache-cli --gasLimit 13000000 -e 100000 --networkId 666",
+    "migrate": "truffle migrate --network testnet --reset",
+    "compile": "truffle compile --network testnet",
+    "test": "rm -rf contracts/flattened/*.sol && truffle test",
+    "flatten": "truffle-flattener contracts/SATOSHIToken.sol > flatten-contracts/SATOSHIToken.sol && truffle-flattener contracts/SATOSHIReferral.sol > flatten-contracts/SATOSHIReferral.sol && truffle-flattener contracts/SATOSHIMasterChef.sol > flatten-contracts/SATOSHIMasterChef.sol && truffle-flattener contracts/SATOSHIMasterChefV2.sol > flatten-contracts/SATOSHIMasterChefV2.sol && truffle-flattener contracts/SATOSHILottery.sol > flatten-contracts/SATOSHILottery.sol && truffle-flattener contracts/Timelock.sol > flatten-contracts/Timelock.sol && truffle-flattener contracts/Multicall.sol > flatten-contracts/Multicall.sol && truffle-flattener contracts/SmartChef.sol > flatten-contracts/SmartChef.sol && node flatten_fix.js",    
+    "flatten-owner": "truffle-flattener contracts/SatoshiFactory.sol > flatten-contracts/SatoshiFactory.sol && truffle-flattener contracts/SatoshiRouter.sol > flatten-contracts/SatoshiRouter.sol && truffle-flattener contracts/SatoshiProfile.sol > flatten-contracts/SatoshiProfile.sol && truffle-flattener contracts/SatoshiPair.sol > flatten-contracts/SatoshiPair.sol && node flatten_fix.js",
+    "flatten-giveaway": "truffle-flattener contracts/SatoshiSWPToken.sol > flatten-contracts/SatoshiSWPToken.sol && truffle-flattener contracts/SatoshiSWP_Contest.sol > flatten-contracts/SatoshiSWP_Contest.sol && node flatten_fix.js"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^3.2.0",
+    "@openzeppelin/test-helpers": "^0.5.6",
+    "@saladswap/salad-swap-lib": "0.0.1",
+    "@uniswap/v2-core": "^1.0.1",
+    "@uniswap/v2-periphery": "^1.1.0-beta.0",
+    "truffle": "^5.1.41"
+  },
+  "devDependencies": {
+    "@nomiclabs/buidler": "^1.4.7",
+    "@nomiclabs/buidler-ethers": "^2.0.0",
+    "@nomiclabs/buidler-truffle5": "^1.3.4",
+    "@nomiclabs/buidler-waffle": "^2.0.0",
+    "@nomiclabs/buidler-web3": "^1.3.4",
+    "chai": "^4.2.0",
+    "ethereum-waffle": "^3.0.0",
+    "ethers": "^5.0.14",
+    "truffle-flattener": "^1.4.4",
+    "truffle-hdwallet-provider": "^1.0.17",
+    "truffle-plugin-verify": "^0.5.0",
+    "web3": "^1.3.0"
+  }
+}
