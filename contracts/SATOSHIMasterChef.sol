@@ -72,6 +72,8 @@ contract MasterChef is Ownable, ReentrancyGuard {
     uint256 public totalAllocPoint = 0;
     // The block number when SATOSHI mining starts.
     uint256 public startBlock;
+    // Deposited amount SATOSHI in MasterChef
+    uint256 public depositedSatoshi;
     // Total locked up rewards
     uint256 public totalLockedUpRewards;
 
@@ -153,6 +155,9 @@ contract MasterChef is Ownable, ReentrancyGuard {
         UserInfo storage user = userInfo[_pid][_user];
         uint256 accSatoshiPerShare = pool.accSatoshiPerShare;
         uint256 lpSupply = pool.lpToken.balanceOf(address(this));
+        if (_pid == 0){
+            lpSupply = depositedSatoshi;
+        }
         if (block.number > pool.lastRewardBlock && lpSupply != 0) {
             uint256 multiplier = getMultiplier(pool.lastRewardBlock, block.number);
             uint256 satoshiReward = multiplier.mul(satoshiPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
@@ -185,8 +190,11 @@ contract MasterChef is Ownable, ReentrancyGuard {
         if (block.number <= pool.lastRewardBlock) {
             return;
         }
-        uint256 lpSupply = pool.lpToken.balanceOf(address(this));
-        if (lpSupply == 0 || pool.allocPoint == 0) {
+        uint256 lpSupply = pool.lpToken.balanceOf(address(this));        
+        if (_pid == 0){
+            lpSupply = depositedSatoshi;
+        }
+        if (lpSupply <= 0 || pool.allocPoint == 0) {
             pool.lastRewardBlock = block.number;
             return;
         }
@@ -201,6 +209,8 @@ contract MasterChef is Ownable, ReentrancyGuard {
 
     // Deposit LP tokens to MasterChef for SATOSHI allocation.
     function deposit(uint256 _pid, uint256 _amount, address _referrer) public nonReentrant {
+        require (_pid != 0, 'deposit SATOSHI by staking');
+
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
         updatePool(_pid);
@@ -228,6 +238,8 @@ contract MasterChef is Ownable, ReentrancyGuard {
 
     // Withdraw LP tokens from MasterChef.
     function withdraw(uint256 _pid, uint256 _amount) public nonReentrant {
+        require (_pid != 0, 'withdraw SATOSHI by unstaking');
+
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
         require(user.amount >= _amount, "withdraw: not good");
@@ -241,16 +253,53 @@ contract MasterChef is Ownable, ReentrancyGuard {
         emit Withdraw(msg.sender, _pid, _amount);
     }
 
+    // Deposit LP tokens to MasterChef for SATOSHI allocation.
+    function enterStaking(uint256 _amount, address _referrer) public nonReentrant {
+        PoolInfo storage pool = poolInfo[0];
+        UserInfo storage user = userInfo[0][msg.sender];
+        updatePool(0);
+        if (_amount > 0 && address(satoshiReferral) != address(0) && _referrer != address(0) && _referrer != msg.sender) {
+            satoshiReferral.recordReferral(msg.sender, _referrer);
+        }
+        payOrLockupPendingSatoshi(0);
+        if (_amount > 0) {
+            pool.lpToken.safeTransferFrom(address(msg.sender), address(this), _amount);
+            if (address(pool.lpToken) == address(satoshi)) {
+                uint256 transferTax = _amount.mul(satoshi.transferTaxRate()).div(10000);
+                _amount = _amount.sub(transferTax);
+            }
+            user.amount = user.amount.add(_amount);
+            depositedSatoshi = depositedSatoshi.add(_amount);
+        }
+        user.rewardDebt = user.amount.mul(pool.accSatoshiPerShare).div(1e12);
+        emit Deposit(msg.sender, 0, _amount);
+    }
+
+    // Withdraw LP tokens from MasterChef.
+    function leaveStaking(uint256 _amount) public nonReentrant {
+        PoolInfo storage pool = poolInfo[0];
+        UserInfo storage user = userInfo[0][msg.sender];
+        require(user.amount >= _amount, "withdraw: not good");
+        updatePool(0);
+        payOrLockupPendingSatoshi(0);
+        if (_amount > 0) {
+            user.amount = user.amount.sub(_amount);
+            pool.lpToken.safeTransfer(address(msg.sender), _amount);
+            depositedSatoshi = depositedSatoshi.sub(_amount);
+        }
+        user.rewardDebt = user.amount.mul(pool.accSatoshiPerShare).div(1e12);
+        emit Withdraw(msg.sender, 0, _amount);
+    }
+
     // Withdraw without caring about rewards. EMERGENCY ONLY.
     function emergencyWithdraw(uint256 _pid) public nonReentrant {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
-        uint256 amount = user.amount;
+        pool.lpToken.safeTransfer(address(msg.sender), user.amount);
+        emit EmergencyWithdraw(msg.sender, _pid, user.amount);
         user.amount = 0;
         user.rewardDebt = 0;
         user.rewardLockedUp = 0;
-        pool.lpToken.safeTransfer(address(msg.sender), amount);
-        emit EmergencyWithdraw(msg.sender, _pid, amount);
     }
 
     function _weekHarvestTimeFromNow() private view returns (uint256) {
@@ -337,7 +386,7 @@ contract MasterChef is Ownable, ReentrancyGuard {
         uint256 length = poolInfo.length;
         for (uint256 pid = 0; pid < length; ++pid) {            
             PoolInfo storage pool = poolInfo[pid];
-            if (pool.lastRewardBlock == startBlock) {
+            if (pool.lastRewardBlock <= _startBlock) {
                 pool.lastRewardBlock = _startBlock;
             }
         }
